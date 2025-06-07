@@ -282,13 +282,13 @@ class MainScene extends Phaser.Scene {
     this.add.image(400, 225, 'background');
     this.sound.add('bgmusic', { loop: true, volume: 0.5 }).play();
 
-    const isElon = data.selected === 'elon';
-    const p1Data = isElon
-      ? { t: 'elon', punch: 'elon_punch', kick: 'elonkick', off: 60, left: false }
-      : { t: 'trump', punch: 'trump_punch', kick: 'trumpkick', off: 95, left: true };
-    const aiData = isElon
-      ? { t: 'trump', punch: 'trump_punch', kick: 'trumpkick', off: 95, left: true }
-      : { t: 'elon', punch: 'elon_punch', kick: 'elonkick', off: 60, left: false };
+const isElon = data.selected === 'elon';
+const p1Data = isElon
+  ? { t: 'elon', punch: 'elon_punch', kick: 'elonkick', off: 60, left: false }
+  : { t: 'trump', punch: 'trump_punch', kick: 'trumpkick', off: 95, left: false }; // <--- always false
+const aiData = isElon
+  ? { t: 'trump', punch: 'trump_punch', kick: 'trumpkick', off: 95, left: true }
+  : { t: 'elon', punch: 'elon_punch', kick: 'elonkick', off: 60, left: true };     // <--- always true
 
     this.player1 = new Fighter(this, 200, 300, p1Data.t, p1Data.punch, p1Data.kick, 80, 80, p1Data.off, p1Data.left);
     this.player2 = new Fighter(this, 600, 300, aiData.t, aiData.punch, aiData.kick, 80, 80, aiData.off, aiData.left);

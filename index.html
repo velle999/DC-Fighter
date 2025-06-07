@@ -52,7 +52,6 @@
     #btn-jump  { left: 44vw; bottom: 12vw; }
     #btn-punch { right: 18vw; bottom: 8vw; }
     #btn-kick  { right: 4vw; bottom: 2vw; }
-    /* Difficulty slider outside Phaser! */
     #diff-container {
       position: fixed;
       left: 50%;
@@ -99,7 +98,6 @@
   <button id="btn-kick"  class="tc-btn">🦶</button>
 </div>
 
-<!-- Difficulty slider OUTSIDE Phaser for perfect clicking -->
 <div id="diff-container">
   <label for="diffslider" style="color:#ffe83b;font-size:1.18em;font-family:Arial;">AI Difficulty:&nbsp;
     <span id="diffdisplay">3</span>
@@ -119,6 +117,7 @@
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 1;
 let GLOBAL_DIFFICULTY = 3;
 
+// --- FIGHTER CLASS WITH HIT STUN (INVINCIBILITY) ---
 class Fighter extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y, texture, punchTexture, kickTexture, hitboxWidth = 80, hitboxHeight = 80, hitboxOffset = 60, facingLeft = false) {
     super(scene, x, y, texture);
@@ -138,6 +137,8 @@ class Fighter extends Phaser.Physics.Arcade.Sprite {
     this.hasHit = false;
     this.isAI = false;
     this.aiTimer = 0;
+
+    this.invincible = false; // For hit stun
 
     this.setFlipX(this.facingLeft);
 
@@ -178,6 +179,10 @@ class Fighter extends Phaser.Physics.Arcade.Sprite {
     if (this.body.blocked.down) this.setVelocityY(-400);
   }
   takeHit(damage, hitX, hitY) {
+    if (this.invincible) return;
+    this.invincible = true;
+    this.scene.time.delayedCall(350, () => { this.invincible = false; });
+
     this.setFlipX(this.facingLeft);
     this.hp -= damage; if (this.hp < 0) this.hp = 0;
     this.scene.sound.play('punch', { volume: 1.5 });
@@ -195,6 +200,7 @@ class Fighter extends Phaser.Physics.Arcade.Sprite {
   }
 }
 
+// --- CHARACTER SELECT SCENE WITH SMART SLIDER HANDLING ---
 class CharacterSelect extends Phaser.Scene {
   constructor() { super('CharacterSelect'); }
   preload() {
@@ -214,7 +220,6 @@ class CharacterSelect extends Phaser.Scene {
     const diffDisplay = document.getElementById('diffdisplay');
     diffSlider.value = GLOBAL_DIFFICULTY;
     diffDisplay.textContent = GLOBAL_DIFFICULTY;
-
     diffSlider.oninput = () => {
       diffDisplay.textContent = diffSlider.value;
       GLOBAL_DIFFICULTY = Number(diffSlider.value);
@@ -226,10 +231,9 @@ class CharacterSelect extends Phaser.Scene {
     this.add.text(250, 370, 'ELON', { fontSize: '24px', color: '#00eaff' }).setOrigin(0.5);
     this.add.text(550, 370, 'TRUMP', { fontSize: '24px', color: '#ffbc00' }).setOrigin(0.5);
 
-    // Use event check instead of sliderActive
+    // Prevent accidental slider drag from selecting fighter:
     const isEventFromSlider = (pointerEvent) => {
       if (!pointerEvent || !pointerEvent.target) return false;
-      // Check if the event target or any parent is #diff-container
       let el = pointerEvent.target;
       while (el) {
         if (el.id === "diff-container") return true;
@@ -239,7 +243,7 @@ class CharacterSelect extends Phaser.Scene {
     };
 
     elon.on('pointerdown', (pointer) => {
-      if (isEventFromSlider(pointer.event)) return; // Ignore if click originated from slider
+      if (isEventFromSlider(pointer.event)) return;
       this.select('elon');
     });
     trump.on('pointerdown', (pointer) => {
@@ -257,6 +261,7 @@ class CharacterSelect extends Phaser.Scene {
   }
 }
 
+// --- MAIN GAME SCENE WITH BALANCED DAMAGE ---
 class MainScene extends Phaser.Scene {
   constructor() { super('MainScene'); }
   preload() {
@@ -312,12 +317,16 @@ class MainScene extends Phaser.Scene {
       A: 'A', D: 'D', W: 'W', S: 'S', SPACE: 'SPACE', ENTER: 'ENTER'
     });
 
+    // --- BALANCED DAMAGE: AI/PLAYER DAMAGE SCALE WITH DIFFICULTY ---
+    const AI_DAMAGE = Math.round(Phaser.Math.Linear(1.2, 2.5, ((DIFFICULTY)-1)/4));        // AI: 1.2 (easy) - 2.5 (max)
+    const PLAYER_DAMAGE = Math.round(Phaser.Math.Linear(2.8, 1.6, ((DIFFICULTY)-1)/4));    // Player: 2.8 (easy) - 1.6 (max)
+
     this.physics.add.overlap(this.player1.attackBox, this.player2, () => {
       if (this.player1.isAttacking && !this.player1.hasHit) {
         this.player1.hasHit = true;
         const { x, y } = this.player2;
         const screen = this.cameras.main.worldView;
-        this.player2.takeHit(2, x - screen.x, y - screen.y);
+        this.player2.takeHit(PLAYER_DAMAGE, x - screen.x, y - screen.y);
         if (this.player2.hp <= 0) this.endRound(`${isElon ? 'Elon' : 'Trump'} Wins!`);
       }
     });
@@ -326,7 +335,7 @@ class MainScene extends Phaser.Scene {
         this.player2.hasHit = true;
         const { x, y } = this.player1;
         const screen = this.cameras.main.worldView;
-        this.player1.takeHit(2, x - screen.x, y - screen.y);
+        this.player1.takeHit(AI_DAMAGE, x - screen.x, y - screen.y);
         if (this.player1.hp <= 0) this.endRound(`${isElon ? 'Trump' : 'Elon'} Wins!`);
       }
     });
@@ -349,7 +358,6 @@ class MainScene extends Phaser.Scene {
       set(document.getElementById('btn-kick'),  'kick');
     }
 
-    // Save for update loop
     this.AI_DIFFICULTY = DIFFICULTY;
   }
   endRound(message) {
@@ -389,17 +397,13 @@ class MainScene extends Phaser.Scene {
       let absDist = Math.abs(dist);
       let verticalDist = ai.y - p1.y;
 
-      // DIFFICULTY: 1 (easy) .. 5 (insane)
-      const d = (this.AI_DIFFICULTY || 3); // 1-5
-
-      // Scale 1=slow, 5=fast
-      const SPEED_FACTOR = Phaser.Math.Linear(0.6, 1.15, (d-1)/4); // 0.6 to 1.15
-      const AGGRO = Phaser.Math.Linear(0.3, 1, (d-1)/4); // How eager to attack/jump
-      const COOLDOWN_MULT = Phaser.Math.Linear(1.6, 0.6, (d-1)/4); // Lower is faster
+      const d = (this.AI_DIFFICULTY || 3);
+      const SPEED_FACTOR = Phaser.Math.Linear(0.6, 1.15, (d-1)/4);
+      const AGGRO = Phaser.Math.Linear(0.3, 1, (d-1)/4);
+      const COOLDOWN_MULT = Phaser.Math.Linear(1.6, 0.6, (d-1)/4);
 
       ai.setVelocityX(0);
 
-      // Fast approach, backs up if too close (all scaled by SPEED_FACTOR)
       if (absDist > 90) {
         ai.setVelocityX((dist > 0 ? -300 : 300) * SPEED_FACTOR);
       } else if (absDist < 60) {
@@ -423,7 +427,7 @@ class MainScene extends Phaser.Scene {
         ai.jump();
       }
 
-      // ATTACK: As soon as in attack range
+      // ATTACK: As soon as in attack range, no more "frame-perfect" AI
       if (
         !ai.isAttacking &&
         absDist < 110 && Math.abs(ai.y - p1.y) < 65

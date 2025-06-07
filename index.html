@@ -8,6 +8,7 @@
     body {
       margin: 0;
       background: black;
+      overflow: hidden;
     }
     canvas {
       display: block;
@@ -20,10 +21,13 @@
 <body>
 <script>
 class Fighter extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y, texture, punchTexture) {
+  constructor(scene, x, y, texture, punchTexture, kickTexture, hitboxWidth = 80, hitboxHeight = 80, hitboxOffset = 60, facingLeft = false) {
     super(scene, x, y, texture);
     this.defaultTexture = texture;
     this.punchTexture = punchTexture;
+    this.kickTexture = kickTexture;
+    this.hitboxOffset = hitboxOffset;
+    this.facingLeft = facingLeft;
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -32,33 +36,86 @@ class Fighter extends Phaser.Physics.Arcade.Sprite {
     this.setScale(0.4);
     this.hp = 100;
     this.isAttacking = false;
-    this.attackBox = scene.add.rectangle(0, 0, 80, 80, 0xff0000, 0.5); // Increased hitbox size
+    this.hasHit = false;
+
+    // 👇 Always set flip at construction
+    this.setFlipX(this.facingLeft);
+    console.log('constructor flip:', this.facingLeft);
+
+    this.attackBox = scene.add.rectangle(0, 0, hitboxWidth, hitboxHeight, 0xff0000, 0.3);
     scene.physics.add.existing(this.attackBox);
     this.attackBox.body.setAllowGravity(false);
     this.attackBox.visible = false;
   }
 
   updateAttackBox() {
-    this.attackBox.x = this.flipX ? this.x - 60 : this.x + 60;
+    this.setFlipX(this.facingLeft); // 👈 <--- Extra flip in every update!
+    this.attackBox.x = this.facingLeft ? this.x - this.hitboxOffset : this.x + this.hitboxOffset;
     this.attackBox.y = this.y;
   }
 
-  attack() {
-    if (!this.isAttacking) {
-      this.isAttacking = true;
-      this.setTexture(this.punchTexture);
-      this.attackBox.visible = true;
-      this.scene.time.delayedCall(300, () => {
-        this.isAttacking = false;
-        this.setTexture(this.defaultTexture);
-        this.attackBox.visible = false;
-      });
+  punch() {
+    if (this.isAttacking) return;
+    this.isAttacking = true;
+    this.hasHit = false;
+    this.setTexture(this.punchTexture);
+    this.setFlipX(this.facingLeft); // 👈 <--- Flip after punch
+    console.log('punch flip:', this.facingLeft);
+    this.attackBox.visible = true;
+    this.scene.time.delayedCall(300, () => {
+      this.setTexture(this.defaultTexture);
+      this.setFlipX(this.facingLeft);
+      this.attackBox.visible = false;
+      this.isAttacking = false;
+    });
+  }
+
+kick() {
+  if (this.isAttacking) return;
+  this.isAttacking = true;
+  this.hasHit = false;
+  this.setTexture(this.kickTexture);
+
+  if (this.texture.key === 'trumpkick' && this.facingLeft) {
+    this.setFlipX(false); // don't flip
+  } else {
+    this.setFlipX(this.facingLeft);
+  }
+
+  this.attackBox.visible = true;
+  this.scene.time.delayedCall(400, () => {
+    this.setTexture(this.defaultTexture);
+    this.setFlipX(this.facingLeft);
+    this.attackBox.visible = false;
+    this.isAttacking = false;
+  });
+}
+
+  jump() {
+    this.setFlipX(this.facingLeft); // 👈 <--- Flip on jump too
+    if (this.body.blocked.down) {
+      this.setVelocityY(-400);
     }
   }
 
-  takeHit(damage) {
+  takeHit(damage, hitX, hitY) {
+    this.setFlipX(this.facingLeft); // 👈 <--- Flip on hit for good measure
     this.hp -= damage;
     if (this.hp < 0) this.hp = 0;
+    this.scene.sound.play('punch', { volume: 1.5 });
+    const blood = this.scene.add.image(hitX, hitY, 'blood').setScale(0.5);
+    this.scene.tweens.add({
+      targets: this.scene.cameras.main,
+      x: { from: -5, to: 5 },
+      y: { from: -5, to: 5 },
+      duration: 50,
+      yoyo: true,
+      repeat: 3,
+      onComplete: () => {
+        this.scene.cameras.main.setPosition(0, 0);
+      }
+    });
+    this.scene.time.delayedCall(300, () => blood.destroy());
   }
 }
 
@@ -72,46 +129,102 @@ class MainScene extends Phaser.Scene {
     this.load.image('trump', 'trump.png');
     this.load.image('elon_punch', 'elon_punch.png');
     this.load.image('trump_punch', 'trump_punch.png');
+    this.load.image('elonkick', 'elonkick.png');
+    this.load.image('trumpkick', 'trumpkick.png');
     this.load.image('background', 'background.png');
+    this.load.image('blood', 'blood.png');
+    this.load.audio('bgmusic', 'bg.mp3');
+    this.load.audio('punch', 'punch.mp3');
   }
 
   create() {
     this.add.image(400, 225, 'background');
+    this.sound.add('bgmusic', { loop: true, volume: 0.5 }).play();
 
-    this.player1 = new Fighter(this, 200, 300, 'elon', 'elon_punch');
-    this.player2 = new Fighter(this, 600, 300, 'trump', 'trump_punch');
-    this.player2.flipX = false; // reverse Trump's facing direction
-
-    this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE');
-
-    this.physics.add.overlap(this.player1.attackBox, this.player2, () => {
-      if (this.player1.isAttacking) this.player2.takeHit(10);
-    });
-    this.physics.add.overlap(this.player2.attackBox, this.player1, () => {
-      if (this.player2.isAttacking) this.player1.takeHit(10);
-    });
+    // Elon (facing right)
+    this.player1 = new Fighter(this, 200, 300, 'elon', 'elon_punch', 'elonkick', 80, 80, 60, false);
+    // Trump (facing left)
+    this.player2 = new Fighter(this, 600, 300, 'trump', 'trump_punch', 'trumpkick', 80, 80, 95, true);
 
     this.hpBar1 = this.add.rectangle(200, 50, 200, 20, 0x00ff00).setOrigin(0.5);
     this.hpBar2 = this.add.rectangle(600, 50, 200, 20, 0x00ff00).setOrigin(0.5);
+
+    this.timerText = this.add.text(400, 20, '60', {
+      fontFamily: 'Arial',
+      fontSize: '28px',
+      color: '#ffffff',
+      align: 'center'
+    }).setOrigin(0.5);
+
+    this.roundTime = 60;
+    this.time.addEvent({
+      delay: 1000,
+      repeat: 59,
+      callback: () => {
+        this.roundTime--;
+        this.timerText.setText(this.roundTime);
+        if (this.roundTime <= 0) {
+          this.endRound('Time’s Up!');
+        }
+      }
+    });
+
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.keys = this.input.keyboard.addKeys({
+      A: 'A', D: 'D', W: 'W', S: 'S', SPACE: 'SPACE', ENTER: 'ENTER'
+    });
+
+    this.physics.add.overlap(this.player1.attackBox, this.player2, () => {
+      if (this.player1.isAttacking && !this.player1.hasHit) {
+        this.player1.hasHit = true;
+        const { x, y } = this.player2;
+        const screen = this.cameras.main.worldView;
+        this.player2.takeHit(2, x - screen.x, y - screen.y);
+        if (this.player2.hp <= 0) this.endRound('Elon Wins!');
+      }
+    });
+
+    this.physics.add.overlap(this.player2.attackBox, this.player1, () => {
+      if (this.player2.isAttacking && !this.player2.hasHit) {
+        this.player2.hasHit = true;
+        const { x, y } = this.player1;
+        const screen = this.cameras.main.worldView;
+        this.player1.takeHit(2, x - screen.x, y - screen.y);
+        if (this.player1.hp <= 0) this.endRound('Trump Wins!');
+      }
+    });
+  }
+
+  endRound(message) {
+    this.physics.pause();
+    this.add.text(400, 225, message, {
+      fontFamily: 'Arial',
+      fontSize: '36px',
+      color: '#ff3333'
+    }).setOrigin(0.5);
   }
 
   update() {
     this.player1.setVelocityX(0);
     if (this.keys.A.isDown) this.player1.setVelocityX(-160);
     else if (this.keys.D.isDown) this.player1.setVelocityX(160);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) this.player1.attack();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.W)) this.player1.jump();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) this.player1.punch();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.S)) this.player1.kick();
 
     this.player2.setVelocityX(0);
     if (this.cursors.left.isDown) this.player2.setVelocityX(-160);
     else if (this.cursors.right.isDown) this.player2.setVelocityX(160);
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.down)) this.player2.attack();
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) this.player2.jump();
+    if (Phaser.Input.Keyboard.JustDown(this.keys.ENTER)) this.player2.punch();
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.down)) this.player2.kick();
 
     this.player1.updateAttackBox();
     this.player2.updateAttackBox();
 
-    this.hpBar1.width = this.player1.hp * 2;
-    this.hpBar2.width = this.player2.hp * 2;
+    // Animate HP bars (simple linear interpolation)
+    this.hpBar1.width += ((this.player1.hp * 2) - this.hpBar1.width) * 0.4;
+    this.hpBar2.width += ((this.player2.hp * 2) - this.hpBar2.width) * 0.4;
   }
 }
 
@@ -123,7 +236,7 @@ const config = {
   physics: {
     default: 'arcade',
     arcade: {
-      gravity: { y: 300 },
+      gravity: { y: 600 },
       debug: false
     }
   },

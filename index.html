@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>Web Fighter</title>
   <style>
     body {
@@ -14,12 +14,59 @@
       display: block;
       margin: 0 auto;
       image-rendering: pixelated;
+      touch-action: none;
     }
+    .touch-controls {
+      position: fixed;
+      bottom: 2vw;
+      left: 0; right: 0;
+      width: 100vw;
+      height: 35vw;
+      pointer-events: none;
+      z-index: 5;
+      display: none;
+    }
+    .tc-btn {
+      pointer-events: all;
+      border: none;
+      background: rgba(50,50,50,0.65);
+      color: #fff;
+      font-size: 4vw;
+      border-radius: 2vw;
+      box-shadow: 0 0 1vw #000b;
+      margin: 0.5vw;
+      width: 12vw; height: 12vw;
+      position: absolute;
+      transition: background .12s;
+      user-select: none;
+      outline: none;
+      opacity: 0.9;
+    }
+    .tc-btn:active {
+      background: #ffbb33;
+      color: #111;
+      opacity: 1;
+    }
+    /* Layout: Move left/right, jump, punch, kick */
+    #btn-left  { left: 2vw; bottom: 2vw; }
+    #btn-right { left: 16vw; bottom: 2vw; }
+    #btn-jump  { left: 44vw; bottom: 12vw; }
+    #btn-punch { right: 18vw; bottom: 8vw; }
+    #btn-kick  { right: 4vw; bottom: 2vw; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 </head>
 <body>
+<div class="touch-controls" id="touch-controls">
+  <button id="btn-left"  class="tc-btn">&#8592;</button>
+  <button id="btn-right" class="tc-btn">&#8594;</button>
+  <button id="btn-jump"  class="tc-btn">&#8593;</button>
+  <button id="btn-punch" class="tc-btn">👊</button>
+  <button id="btn-kick"  class="tc-btn">🦶</button>
+</div>
 <script>
+const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 1;
+
 class Fighter extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y, texture, punchTexture, kickTexture, hitboxWidth = 80, hitboxHeight = 80, hitboxOffset = 60, facingLeft = false) {
     super(scene, x, y, texture);
@@ -38,70 +85,48 @@ class Fighter extends Phaser.Physics.Arcade.Sprite {
     this.isAttacking = false;
     this.hasHit = false;
 
-    // 👇 Always set flip at construction
     this.setFlipX(this.facingLeft);
-    console.log('constructor flip:', this.facingLeft);
 
     this.attackBox = scene.add.rectangle(0, 0, hitboxWidth, hitboxHeight, 0xff0000, 0.3);
     scene.physics.add.existing(this.attackBox);
     this.attackBox.body.setAllowGravity(false);
     this.attackBox.visible = false;
   }
-
   updateAttackBox() {
-    this.setFlipX(this.facingLeft); // 👈 <--- Extra flip in every update!
+    this.setFlipX(this.facingLeft);
     this.attackBox.x = this.facingLeft ? this.x - this.hitboxOffset : this.x + this.hitboxOffset;
     this.attackBox.y = this.y;
   }
-
   punch() {
     if (this.isAttacking) return;
-    this.isAttacking = true;
-    this.hasHit = false;
-    this.setTexture(this.punchTexture);
-    this.setFlipX(this.facingLeft); // 👈 <--- Flip after punch
-    console.log('punch flip:', this.facingLeft);
+    this.isAttacking = true; this.hasHit = false;
+    this.setTexture(this.punchTexture); this.setFlipX(this.facingLeft);
     this.attackBox.visible = true;
     this.scene.time.delayedCall(300, () => {
-      this.setTexture(this.defaultTexture);
-      this.setFlipX(this.facingLeft);
-      this.attackBox.visible = false;
-      this.isAttacking = false;
+      this.setTexture(this.defaultTexture); this.setFlipX(this.facingLeft);
+      this.attackBox.visible = false; this.isAttacking = false;
     });
   }
-
-kick() {
-  if (this.isAttacking) return;
-  this.isAttacking = true;
-  this.hasHit = false;
-  this.setTexture(this.kickTexture);
-
-  if (this.texture.key === 'trumpkick' && this.facingLeft) {
-    this.setFlipX(false); // don't flip
-  } else {
-    this.setFlipX(this.facingLeft);
+  kick() {
+    if (this.isAttacking) return;
+    this.isAttacking = true; this.hasHit = false;
+    this.setTexture(this.kickTexture);
+    // For Trump: if your trumpkick.png is already facing left, don't flip again!
+    if (this.texture.key === 'trumpkick' && this.facingLeft) this.setFlipX(false);
+    else this.setFlipX(this.facingLeft);
+    this.attackBox.visible = true;
+    this.scene.time.delayedCall(400, () => {
+      this.setTexture(this.defaultTexture); this.setFlipX(this.facingLeft);
+      this.attackBox.visible = false; this.isAttacking = false;
+    });
   }
-
-  this.attackBox.visible = true;
-  this.scene.time.delayedCall(400, () => {
-    this.setTexture(this.defaultTexture);
-    this.setFlipX(this.facingLeft);
-    this.attackBox.visible = false;
-    this.isAttacking = false;
-  });
-}
-
   jump() {
-    this.setFlipX(this.facingLeft); // 👈 <--- Flip on jump too
-    if (this.body.blocked.down) {
-      this.setVelocityY(-400);
-    }
+    this.setFlipX(this.facingLeft);
+    if (this.body.blocked.down) this.setVelocityY(-400);
   }
-
   takeHit(damage, hitX, hitY) {
-    this.setFlipX(this.facingLeft); // 👈 <--- Flip on hit for good measure
-    this.hp -= damage;
-    if (this.hp < 0) this.hp = 0;
+    this.setFlipX(this.facingLeft);
+    this.hp -= damage; if (this.hp < 0) this.hp = 0;
     this.scene.sound.play('punch', { volume: 1.5 });
     const blood = this.scene.add.image(hitX, hitY, 'blood').setScale(0.5);
     this.scene.tweens.add({
@@ -111,19 +136,14 @@ kick() {
       duration: 50,
       yoyo: true,
       repeat: 3,
-      onComplete: () => {
-        this.scene.cameras.main.setPosition(0, 0);
-      }
+      onComplete: () => this.scene.cameras.main.setPosition(0, 0)
     });
     this.scene.time.delayedCall(300, () => blood.destroy());
   }
 }
 
 class MainScene extends Phaser.Scene {
-  constructor() {
-    super('MainScene');
-  }
-
+  constructor() { super('MainScene'); }
   preload() {
     this.load.image('elon', 'elon.png');
     this.load.image('trump', 'trump.png');
@@ -136,36 +156,27 @@ class MainScene extends Phaser.Scene {
     this.load.audio('bgmusic', 'bg.mp3');
     this.load.audio('punch', 'punch.mp3');
   }
-
   create() {
     this.add.image(400, 225, 'background');
     this.sound.add('bgmusic', { loop: true, volume: 0.5 }).play();
 
-    // Elon (facing right)
     this.player1 = new Fighter(this, 200, 300, 'elon', 'elon_punch', 'elonkick', 80, 80, 60, false);
-    // Trump (facing left)
     this.player2 = new Fighter(this, 600, 300, 'trump', 'trump_punch', 'trumpkick', 80, 80, 95, true);
 
     this.hpBar1 = this.add.rectangle(200, 50, 200, 20, 0x00ff00).setOrigin(0.5);
     this.hpBar2 = this.add.rectangle(600, 50, 200, 20, 0x00ff00).setOrigin(0.5);
 
     this.timerText = this.add.text(400, 20, '60', {
-      fontFamily: 'Arial',
-      fontSize: '28px',
-      color: '#ffffff',
-      align: 'center'
+      fontFamily: 'Arial', fontSize: '28px', color: '#ffffff', align: 'center'
     }).setOrigin(0.5);
 
     this.roundTime = 60;
     this.time.addEvent({
-      delay: 1000,
-      repeat: 59,
+      delay: 1000, repeat: 59,
       callback: () => {
         this.roundTime--;
         this.timerText.setText(this.roundTime);
-        if (this.roundTime <= 0) {
-          this.endRound('Time’s Up!');
-        }
+        if (this.roundTime <= 0) this.endRound('Time’s Up!');
       }
     });
 
@@ -183,7 +194,6 @@ class MainScene extends Phaser.Scene {
         if (this.player2.hp <= 0) this.endRound('Elon Wins!');
       }
     });
-
     this.physics.add.overlap(this.player2.attackBox, this.player1, () => {
       if (this.player2.isAttacking && !this.player2.hasHit) {
         this.player2.hasHit = true;
@@ -193,25 +203,56 @@ class MainScene extends Phaser.Scene {
         if (this.player1.hp <= 0) this.endRound('Trump Wins!');
       }
     });
-  }
 
+    // --- Mobile Touch Controls ---
+    if (IS_TOUCH) {
+      document.getElementById('touch-controls').style.display = '';
+      this.touchState = { left: false, right: false, jump: false, punch: false, kick: false };
+      const set = (btn, prop) => {
+        btn.addEventListener('touchstart', e => { e.preventDefault(); this.touchState[prop] = true; }, {passive:false});
+        btn.addEventListener('touchend',   e => { e.preventDefault(); this.touchState[prop] = false; }, {passive:false});
+        btn.addEventListener('mousedown',  e => { e.preventDefault(); this.touchState[prop] = true; });
+        btn.addEventListener('mouseup',    e => { e.preventDefault(); this.touchState[prop] = false; });
+        btn.addEventListener('mouseleave', e => { this.touchState[prop] = false; });
+      };
+      set(document.getElementById('btn-left'),  'left');
+      set(document.getElementById('btn-right'), 'right');
+      set(document.getElementById('btn-jump'),  'jump');
+      set(document.getElementById('btn-punch'), 'punch');
+      set(document.getElementById('btn-kick'),  'kick');
+    }
+  }
   endRound(message) {
     this.physics.pause();
     this.add.text(400, 225, message, {
-      fontFamily: 'Arial',
-      fontSize: '36px',
-      color: '#ff3333'
+      fontFamily: 'Arial', fontSize: '36px', color: '#ff3333'
     }).setOrigin(0.5);
   }
-
   update() {
-    this.player1.setVelocityX(0);
-    if (this.keys.A.isDown) this.player1.setVelocityX(-160);
-    else if (this.keys.D.isDown) this.player1.setVelocityX(160);
-    if (Phaser.Input.Keyboard.JustDown(this.keys.W)) this.player1.jump();
-    if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) this.player1.punch();
-    if (Phaser.Input.Keyboard.JustDown(this.keys.S)) this.player1.kick();
+    // --- PC controls ---
+    let p1Left = this.keys.A.isDown;
+    let p1Right = this.keys.D.isDown;
+    let p1Jump = Phaser.Input.Keyboard.JustDown(this.keys.W);
+    let p1Punch = Phaser.Input.Keyboard.JustDown(this.keys.SPACE);
+    let p1Kick = Phaser.Input.Keyboard.JustDown(this.keys.S);
 
+    // --- Touch controls override for P1 (Elon) ---
+    if (IS_TOUCH && this.touchState) {
+      p1Left = this.touchState.left;
+      p1Right = this.touchState.right;
+      if (this.touchState.jump) { p1Jump = true; this.touchState.jump = false; }
+      if (this.touchState.punch) { p1Punch = true; this.touchState.punch = false; }
+      if (this.touchState.kick)  { p1Kick = true;  this.touchState.kick = false; }
+    }
+
+    this.player1.setVelocityX(0);
+    if (p1Left)  this.player1.setVelocityX(-160);
+    else if (p1Right) this.player1.setVelocityX(160);
+    if (p1Jump) this.player1.jump();
+    if (p1Punch) this.player1.punch();
+    if (p1Kick) this.player1.kick();
+
+    // Player 2 (Trump) uses PC keyboard only
     this.player2.setVelocityX(0);
     if (this.cursors.left.isDown) this.player2.setVelocityX(-160);
     else if (this.cursors.right.isDown) this.player2.setVelocityX(160);
@@ -222,11 +263,21 @@ class MainScene extends Phaser.Scene {
     this.player1.updateAttackBox();
     this.player2.updateAttackBox();
 
-    // Animate HP bars (simple linear interpolation)
     this.hpBar1.width += ((this.player1.hp * 2) - this.hpBar1.width) * 0.4;
     this.hpBar2.width += ((this.player2.hp * 2) - this.hpBar2.width) * 0.4;
   }
 }
+
+const resizeGame = () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  const r = Math.min(w/800, h/450);
+  const canvas = document.querySelector('canvas');
+  if (canvas) {
+    canvas.style.width = (800*r)+"px";
+    canvas.style.height = (450*r)+"px";
+  }
+};
+window.addEventListener('resize', resizeGame);
 
 const config = {
   type: Phaser.AUTO,
@@ -235,15 +286,19 @@ const config = {
   backgroundColor: '#222222',
   physics: {
     default: 'arcade',
-    arcade: {
-      gravity: { y: 600 },
-      debug: false
-    }
+    arcade: { gravity: { y: 600 }, debug: false }
   },
-  scene: MainScene
+  scene: MainScene,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 800,
+    height: 450
+  }
 };
 
 const game = new Phaser.Game(config);
+window.addEventListener('load', resizeGame);
 </script>
 </body>
 </html>

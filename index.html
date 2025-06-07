@@ -2,90 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=800, initial-scale=1.0, user-scalable=no" />
   <title>Web Fighter</title>
   <style>
-    body {
-      margin: 0;
-      background: black;
-      overflow: hidden;
-    }
-    canvas {
-      display: block;
-      margin: 0 auto;
-      image-rendering: pixelated;
-      touch-action: none;
-    }
+    body { margin: 0; background: black; overflow: hidden; }
+    canvas { display: block; margin: 0 auto; image-rendering: pixelated; touch-action: none; }
     .touch-controls {
-      position: fixed;
-      bottom: 2vw;
-      left: 0; right: 0;
-      width: 100vw;
-      height: 35vw;
-      pointer-events: none;
-      z-index: 5;
-      display: none;
+      position: fixed; bottom: 2vw; left: 0; right: 0;
+      width: 100vw; height: 35vw; pointer-events: none; z-index: 5; display: none;
     }
     .tc-btn {
       pointer-events: all;
-      border: none;
-      background: rgba(50,50,50,0.65);
-      color: #fff;
-      font-size: 4vw;
-      border-radius: 2vw;
-      box-shadow: 0 0 1vw #000b;
-      margin: 0.5vw;
-      width: 12vw; height: 12vw;
-      position: absolute;
-      transition: background .12s;
-      user-select: none;
-      outline: none;
-      opacity: 0.9;
+      border: none; background: rgba(50,50,50,0.65); color: #fff;
+      font-size: 4vw; border-radius: 2vw; box-shadow: 0 0 1vw #000b;
+      margin: 0.5vw; width: 12vw; height: 12vw; position: absolute;
+      transition: background .12s; user-select: none; outline: none; opacity: 0.9;
     }
-    .tc-btn:active {
-      background: #ffbb33;
-      color: #111;
-      opacity: 1;
-    }
+    .tc-btn:active { background: #ffbb33; color: #111; opacity: 1; }
     #btn-left  { left: 2vw; bottom: 2vw; }
     #btn-right { left: 16vw; bottom: 2vw; }
     #btn-jump  { left: 44vw; bottom: 12vw; }
     #btn-punch { right: 18vw; bottom: 8vw; }
     #btn-kick  { right: 4vw; bottom: 2vw; }
     #diff-container {
-      position: fixed;
-      left: 50%;
-      top: 70%;
-      transform: translate(-50%, -50%);
-      z-index: 99;
-      background: rgba(20,20,30,0.92);
-      padding: 18px 32px 10px 32px;
-      border-radius: 16px;
-      box-shadow: 0 2px 14px #000a;
-      display: none;
-      min-width: 260px;
-      text-align: center;
-      pointer-events: auto;
-      user-select: none;
+      position: fixed; left: 50%; top: 70%; transform: translate(-50%, -50%);
+      z-index: 99; background: rgba(20,20,30,0.92); padding: 18px 32px 10px 32px;
+      border-radius: 16px; box-shadow: 0 2px 14px #000a;
+      display: none; min-width: 260px; text-align: center; pointer-events: auto;
     }
-    #diffslider {
-      width: 210px;
-      margin-top: 6px;
-    }
+    #diffslider { width: 210px; margin-top: 6px; }
     #diff-labels {
-      display: flex;
-      justify-content: space-between;
-      color: #999;
-      font-size: 0.92em;
-      width: 210px;
-      margin: 0 auto;
-      margin-top: 2px;
-      letter-spacing: 0.5px;
+      display: flex; justify-content: space-between; color: #999; font-size: 0.92em;
+      width: 210px; margin: 0 auto; margin-top: 2px; letter-spacing: 0.5px;
     }
-    #diffdisplay {
-      color: #fff;
-      font-weight: bold;
-      padding: 0 2px;
+    #diffdisplay { color: #fff; font-weight: bold; padding: 0 2px; }
+    .char-label {
+      font-size: 24px; font-family: Arial; font-weight: bold; letter-spacing: 2px;
+      margin-top: 8px; text-shadow: 1px 2px 6px #000c;
+    }
+    .char-img {
+      border-radius: 16px; transition: box-shadow 0.15s, transform 0.12s;
+      background: #222c; cursor: pointer; border: 3px solid transparent;
+      box-shadow: 0 4px 16px #000b;
+    }
+    .char-img.selected, .char-img:hover {
+      box-shadow: 0 0 32px #ffe83b88, 0 4px 16px #000b;
+      border: 3px solid #ffe83b; transform: scale(1.07);
     }
   </style>
 </head>
@@ -97,7 +59,6 @@
   <button id="btn-punch" class="tc-btn">👊</button>
   <button id="btn-kick"  class="tc-btn">🦶</button>
 </div>
-
 <div id="diff-container">
   <label for="diffslider" style="color:#ffe83b;font-size:1.18em;font-family:Arial;">AI Difficulty:&nbsp;
     <span id="diffdisplay">3</span>
@@ -111,17 +72,21 @@
     <span>BROKEN</span>
   </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 <script>
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 1;
 let GLOBAL_DIFFICULTY = 3;
 
-// --- FIGHTER CLASS WITH HIT STUN (INVINCIBILITY) ---
+const FIGHTERS = {
+  elon:   { label: 'ELON',   color: '#00eaff',  img: 'elon.png', punch: 'elon_punch.png', kick: 'elonkick.png', offset: 60, scale: 0.22 },
+  trump:  { label: 'TRUMP',  color: '#ffbc00',  img: 'trump.png', punch: 'trump_punch.png', kick: 'trumpkick.png', offset: 95, scale: 0.31 },
+  pelosi: { label: 'PELOSI', color: '#ff69b4',  img: 'pelosi.png', punch: 'pelosipunch.png', kick: 'pelosikick.png', offset: 85, scale: 0.21 }
+};
+
 class Fighter extends Phaser.Physics.Arcade.Sprite {
-  constructor(scene, x, y, texture, punchTexture, kickTexture, hitboxWidth = 80, hitboxHeight = 80, hitboxOffset = 60, facingLeft = false) {
-    super(scene, x, y, texture);
-    this.defaultTexture = texture;
+  constructor(scene, x, y, key, punchTexture, kickTexture, hitboxWidth = 80, hitboxHeight = 80, hitboxOffset = 60, facingLeft = false) {
+    super(scene, x, y, key);
+    this.defaultTexture = key;
     this.punchTexture = punchTexture;
     this.kickTexture = kickTexture;
     this.hitboxOffset = hitboxOffset;
@@ -131,18 +96,16 @@ class Fighter extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
 
     this.setCollideWorldBounds(true);
-    this.setScale(0.4);
+    this.setScale(FIGHTERS[key]?.scale || 0.36);
     this.hp = 100;
     this.isAttacking = false;
     this.hasHit = false;
     this.isAI = false;
     this.aiTimer = 0;
+    this.invincible = false;
 
-    this.invincible = false; // For hit stun
-
-    this.setFlipX(this.facingLeft);
-
-    this.attackBox = scene.add.rectangle(0, 0, hitboxWidth, hitboxHeight, 0xff0000, 0.3);
+    // Make attackBox always invisible (no debug box, no alpha)
+    this.attackBox = scene.add.rectangle(0, 0, hitboxWidth, hitboxHeight, 0xff0000, 0);
     scene.physics.add.existing(this.attackBox);
     this.attackBox.body.setAllowGravity(false);
     this.attackBox.visible = false;
@@ -155,27 +118,28 @@ class Fighter extends Phaser.Physics.Arcade.Sprite {
   punch() {
     if (this.isAttacking) return;
     this.isAttacking = true; this.hasHit = false;
-    this.setTexture(this.punchTexture); this.setFlipX(this.facingLeft);
-    this.attackBox.visible = true;
+    this.setTexture(this.punchTexture);
+    this.setFlipX(this.facingLeft);
+    // Attack box is never visible
     this.scene.time.delayedCall(300, () => {
-      this.setTexture(this.defaultTexture); this.setFlipX(this.facingLeft);
-      this.attackBox.visible = false; this.isAttacking = false;
+      this.setTexture(this.defaultTexture);
+      this.setFlipX(this.facingLeft);
+      this.isAttacking = false;
     });
   }
   kick() {
     if (this.isAttacking) return;
     this.isAttacking = true; this.hasHit = false;
     this.setTexture(this.kickTexture);
-    if (this.texture.key === 'trumpkick' && this.facingLeft) this.setFlipX(false);
-    else this.setFlipX(this.facingLeft);
-    this.attackBox.visible = true;
+    this.setFlipX(this.facingLeft);
+    // Attack box is never visible
     this.scene.time.delayedCall(400, () => {
-      this.setTexture(this.defaultTexture); this.setFlipX(this.facingLeft);
-      this.attackBox.visible = false; this.isAttacking = false;
+      this.setTexture(this.defaultTexture);
+      this.setFlipX(this.facingLeft);
+      this.isAttacking = false;
     });
   }
   jump() {
-    this.setFlipX(this.facingLeft);
     if (this.body.blocked.down) this.setVelocityY(-400);
   }
   takeHit(damage, hitX, hitY) {
@@ -183,10 +147,10 @@ class Fighter extends Phaser.Physics.Arcade.Sprite {
     this.invincible = true;
     this.scene.time.delayedCall(350, () => { this.invincible = false; });
 
-    this.setFlipX(this.facingLeft);
     this.hp -= damage; if (this.hp < 0) this.hp = 0;
     this.scene.sound.play('punch', { volume: 1.5 });
-    const blood = this.scene.add.image(hitX, hitY, 'blood').setScale(0.5);
+    // BLOOD is now 35% smaller (0.5 * 0.65 = 0.325)
+    const blood = this.scene.add.image(hitX, hitY, 'blood').setScale(0.325);
     this.scene.tweens.add({
       targets: this.scene.cameras.main,
       x: { from: -5, to: 5 },
@@ -200,77 +164,98 @@ class Fighter extends Phaser.Physics.Arcade.Sprite {
   }
 }
 
-// --- CHARACTER SELECT SCENE WITH SMART SLIDER HANDLING ---
 class CharacterSelect extends Phaser.Scene {
   constructor() { super('CharacterSelect'); }
   preload() {
-    this.load.image('elon', 'elon.png');
-    this.load.image('trump', 'trump.png');
+    for (const k in FIGHTERS) {
+      const f = FIGHTERS[k];
+      this.load.image(k, f.img);
+      this.load.image(`${k}_punch`, f.punch);
+      this.load.image(`${k}_kick`,  f.kick);
+    }
     this.load.image('background', 'background.png');
   }
-  create() {
-    this.add.image(400, 225, 'background');
-    this.add.text(400, 80, 'CHOOSE YOUR FIGHTER', {
-      fontFamily: 'Arial', fontSize: '38px', color: '#fff'
-    }).setOrigin(0.5);
+create() {
+  this.add.image(400, 225, 'background');
+  this.add.text(400, 80, 'CHOOSE YOUR FIGHTER', {
+    fontFamily: 'Arial', fontSize: '38px', color: '#fff'
+  }).setOrigin(0.5);
 
-    document.getElementById('diff-container').style.display = 'block';
+  document.getElementById('diff-container').style.display = 'block';
+  const diffSlider = document.getElementById('diffslider');
+  const diffDisplay = document.getElementById('diffdisplay');
+  diffSlider.value = GLOBAL_DIFFICULTY;
+  diffDisplay.textContent = GLOBAL_DIFFICULTY;
+  diffSlider.oninput = () => {
+    diffDisplay.textContent = diffSlider.value;
+    GLOBAL_DIFFICULTY = Number(diffSlider.value);
+  };
 
-    const diffSlider = document.getElementById('diffslider');
-    const diffDisplay = document.getElementById('diffdisplay');
-    diffSlider.value = GLOBAL_DIFFICULTY;
-    diffDisplay.textContent = GLOBAL_DIFFICULTY;
-    diffSlider.oninput = () => {
-      diffDisplay.textContent = diffSlider.value;
-      GLOBAL_DIFFICULTY = Number(diffSlider.value);
-    };
+  // Character feet on ground at y=405
+  const groundY = 405;
+  const charKeys = Object.keys(FIGHTERS);
+  const positions = [
+    {x: 200}, {x: 400}, {x: 600}
+  ];
+  let charImgs = {};
 
-    // --- Character select ---
-    const elon = this.add.image(250, 270, 'elon').setScale(0.5).setInteractive();
-    const trump = this.add.image(550, 270, 'trump').setScale(0.5).setInteractive();
-    this.add.text(250, 370, 'ELON', { fontSize: '24px', color: '#00eaff' }).setOrigin(0.5);
-    this.add.text(550, 370, 'TRUMP', { fontSize: '24px', color: '#ffbc00' }).setOrigin(0.5);
-
-    // Prevent accidental slider drag from selecting fighter:
-    const isEventFromSlider = (pointerEvent) => {
-      if (!pointerEvent || !pointerEvent.target) return false;
-      let el = pointerEvent.target;
-      while (el) {
-        if (el.id === "diff-container") return true;
-        el = el.parentElement;
-      }
-      return false;
-    };
-
-    elon.on('pointerdown', (pointer) => {
-      if (isEventFromSlider(pointer.event)) return;
-      this.select('elon');
+  charKeys.forEach((key, i) => {
+    const f = FIGHTERS[key];
+    const scale = f.scale || 0.38;
+    let img = this.add.image(positions[i].x, groundY, key)
+      .setScale(scale)
+      .setOrigin(0.5, 1) // feet are at groundY
+      .setInteractive({ useHandCursor: true })
+      .setData('charKey', key)
+      .setDepth(1);
+    img.setTint(0xffffff);
+    charImgs[key] = img;
+    img.on('pointerover', () => img.setTint(0xffe83b));
+    img.on('pointerout',  () => img.setTint(0xffffff));
+    img.on('pointerdown', (pointer) => {
+      if (this.isEventFromSlider(pointer.event)) return;
+      this.pickFighter(key, charImgs);
     });
-    trump.on('pointerdown', (pointer) => {
-      if (isEventFromSlider(pointer.event)) return;
-      this.select('trump');
-    });
+    // Label just below feet
+    this.add.text(positions[i].x, groundY + 24, f.label, {
+      fontSize: '24px', color: f.color, fontFamily: 'Arial', fontWeight: 'bold', align: 'center'
+    }).setOrigin(0.5, 0);
+  });
 
-    // Keyboard select always allowed
-    this.input.keyboard.on('keydown-E', () => this.select('elon'));
-    this.input.keyboard.on('keydown-T', () => this.select('trump'));
+  // Keyboard shortcuts for E, T, P
+  this.input.keyboard.on('keydown-E', () => this.pickFighter('elon', charImgs));
+  this.input.keyboard.on('keydown-T', () => this.pickFighter('trump', charImgs));
+  this.input.keyboard.on('keydown-P', () => this.pickFighter('pelosi', charImgs));
+}
+  pickFighter(key, charImgs) {
+    for (const k in charImgs) charImgs[k].setTint(0xffffff);
+    charImgs[key]?.setTint(0x33ff33);
+
+    setTimeout(() => {
+      document.getElementById('diff-container').style.display = 'none';
+      this.scene.start('MainScene', { selected: key, difficulty: GLOBAL_DIFFICULTY });
+    }, 130);
   }
-  select(character) {
-    document.getElementById('diff-container').style.display = 'none';
-    this.scene.start('MainScene', { selected: character, difficulty: GLOBAL_DIFFICULTY });
+  isEventFromSlider(pointerEvent) {
+    if (!pointerEvent || !pointerEvent.target) return false;
+    let el = pointerEvent.target;
+    while (el) {
+      if (el.id === "diff-container") return true;
+      el = el.parentElement;
+    }
+    return false;
   }
 }
 
-// --- MAIN GAME SCENE WITH BALANCED DAMAGE ---
 class MainScene extends Phaser.Scene {
   constructor() { super('MainScene'); }
   preload() {
-    this.load.image('elon', 'elon.png');
-    this.load.image('trump', 'trump.png');
-    this.load.image('elon_punch', 'elon_punch.png');
-    this.load.image('trump_punch', 'trump_punch.png');
-    this.load.image('elonkick', 'elonkick.png');
-    this.load.image('trumpkick', 'trumpkick.png');
+    for (const k in FIGHTERS) {
+      const f = FIGHTERS[k];
+      this.load.image(k, f.img);
+      this.load.image(`${k}_punch`, f.punch);
+      this.load.image(`${k}_kick`,  f.kick);
+    }
     this.load.image('background', 'background.png');
     this.load.image('blood', 'blood.png');
     this.load.audio('bgmusic', 'bg.mp3');
@@ -278,20 +263,24 @@ class MainScene extends Phaser.Scene {
   }
   create(data) {
     const DIFFICULTY = data.difficulty || GLOBAL_DIFFICULTY || 3;
-
     this.add.image(400, 225, 'background');
     this.sound.add('bgmusic', { loop: true, volume: 0.5 }).play();
 
-const isElon = data.selected === 'elon';
-const p1Data = isElon
-  ? { t: 'elon', punch: 'elon_punch', kick: 'elonkick', off: 60, left: false }
-  : { t: 'trump', punch: 'trump_punch', kick: 'trumpkick', off: 95, left: false }; // <--- always false
-const aiData = isElon
-  ? { t: 'trump', punch: 'trump_punch', kick: 'trumpkick', off: 95, left: true }
-  : { t: 'elon', punch: 'elon_punch', kick: 'elonkick', off: 60, left: true };     // <--- always true
+    const selectedKey = data.selected;
+    const p1Conf = FIGHTERS[selectedKey];
 
-    this.player1 = new Fighter(this, 200, 300, p1Data.t, p1Data.punch, p1Data.kick, 80, 80, p1Data.off, p1Data.left);
-    this.player2 = new Fighter(this, 600, 300, aiData.t, aiData.punch, aiData.kick, 80, 80, aiData.off, aiData.left);
+    // AI picks randomly from the remaining two
+    let aiKeys = Object.keys(FIGHTERS).filter(k => k !== selectedKey);
+    const aiKey = aiKeys[Math.floor(Math.random() * aiKeys.length)];
+    const aiConf = FIGHTERS[aiKey];
+
+    // Player always faces right (never flipped), AI always faces left (flipped)
+    this.player1 = new Fighter(this, 200, 300, selectedKey, `${selectedKey}_punch`, `${selectedKey}_kick`, 80, 80, p1Conf.offset, false);
+    this.player2 = new Fighter(this, 600, 300, aiKey, `${aiKey}_punch`, `${aiKey}_kick`, 80, 80, aiConf.offset, true);
+
+    // Pelosi: only flip if AI, otherwise always right
+    if (selectedKey === 'pelosi') this.player1.setFlipX(false);
+    if (aiKey === 'pelosi') this.player2.setFlipX(true);
 
     this.player2.isAI = true;
 
@@ -317,9 +306,9 @@ const aiData = isElon
       A: 'A', D: 'D', W: 'W', S: 'S', SPACE: 'SPACE', ENTER: 'ENTER'
     });
 
-    // --- BALANCED DAMAGE: AI/PLAYER DAMAGE SCALE WITH DIFFICULTY ---
-    const AI_DAMAGE = Math.round(Phaser.Math.Linear(1.2, 2.5, ((DIFFICULTY)-1)/4));        // AI: 1.2 (easy) - 2.5 (max)
-    const PLAYER_DAMAGE = Math.round(Phaser.Math.Linear(2.8, 1.6, ((DIFFICULTY)-1)/4));    // Player: 2.8 (easy) - 1.6 (max)
+    // BALANCED DAMAGE (scales with difficulty)
+    const AI_DAMAGE = Math.round(Phaser.Math.Linear(1.2, 2.5, ((DIFFICULTY)-1)/4));
+    const PLAYER_DAMAGE = Math.round(Phaser.Math.Linear(2.8, 1.6, ((DIFFICULTY)-1)/4));
 
     this.physics.add.overlap(this.player1.attackBox, this.player2, () => {
       if (this.player1.isAttacking && !this.player1.hasHit) {
@@ -327,7 +316,7 @@ const aiData = isElon
         const { x, y } = this.player2;
         const screen = this.cameras.main.worldView;
         this.player2.takeHit(PLAYER_DAMAGE, x - screen.x, y - screen.y);
-        if (this.player2.hp <= 0) this.endRound(`${isElon ? 'Elon' : 'Trump'} Wins!`);
+        if (this.player2.hp <= 0) this.endRound(`${p1Conf.label} Wins!`);
       }
     });
     this.physics.add.overlap(this.player2.attackBox, this.player1, () => {
@@ -336,7 +325,7 @@ const aiData = isElon
         const { x, y } = this.player1;
         const screen = this.cameras.main.worldView;
         this.player1.takeHit(AI_DAMAGE, x - screen.x, y - screen.y);
-        if (this.player1.hp <= 0) this.endRound(`${isElon ? 'Trump' : 'Elon'} Wins!`);
+        if (this.player1.hp <= 0) this.endRound(`${aiConf.label} Wins!`);
       }
     });
 
@@ -404,30 +393,42 @@ const aiData = isElon
 
       ai.setVelocityX(0);
 
-      if (absDist > 90) {
-        ai.setVelocityX((dist > 0 ? -300 : 300) * SPEED_FACTOR);
-      } else if (absDist < 60) {
-        ai.setVelocityX((dist > 0 ? 120 : -120) * SPEED_FACTOR);
+      // --- Smarter AI: bounce around, but don't always "hug" player
+      // If too close, bounce away sometimes; if too far, move closer
+      if (absDist > 120) {
+        ai.setVelocityX((dist > 0 ? -240 : 240) * SPEED_FACTOR);
+      } else if (absDist < 65) {
+        // If AI is TOO close, sometimes move away or just idle, to avoid sticking on you
+        if (Math.random() < 0.25 * AGGRO) {
+          ai.setVelocityX((dist > 0 ? 140 : -140) * SPEED_FACTOR); // small nudge away
+        } else {
+          ai.setVelocityX(0); // idle
+        }
+      } else {
+        // Moderate distance, bounce randomly or strafe
+        if (Math.random() < 0.12 * AGGRO) {
+          ai.setVelocityX((Math.random() < 0.5 ? -1 : 1) * 120 * SPEED_FACTOR);
+        }
       }
 
-      // JUMP-OVER: chance to leap over you, scales with AGGRO
+      // JUMP-OVER: chance to leap over you, but not all the time
       if (
         ai.body.blocked.down &&
-        absDist < 150 && absDist > 40 &&
-        Math.random() < 0.20 * AGGRO
+        absDist < 150 && absDist > 45 &&
+        Math.random() < 0.17 * AGGRO
       ) {
         ai.setVelocityY(-440 * SPEED_FACTOR);
         ai.setVelocityX((dist > 0 ? -260 : 260) * SPEED_FACTOR);
       }
-      // Random hopping, scales with AGGRO
+      // Random hopping, scales with AGGRO, or if on wrong vertical level
       else if (
         ai.body.blocked.down &&
-        (Math.random() < 0.08 * AGGRO || (verticalDist > 50 && Math.abs(verticalDist) > 40))
+        (Math.random() < 0.07 * AGGRO || (verticalDist > 55 && Math.abs(verticalDist) > 40))
       ) {
         ai.jump();
       }
 
-      // ATTACK: As soon as in attack range, no more "frame-perfect" AI
+      // ATTACK: As soon as in attack range, no more frame-perfect AI
       if (
         !ai.isAttacking &&
         absDist < 110 && Math.abs(ai.y - p1.y) < 65

@@ -70,18 +70,11 @@
       color: #1a1a1a;
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-</head>
-<body>
-<div class="touch-controls" id="touch-controls">
-  <button id="btn-left"  class="tc-btn">&#8592;</button>
-  <button id="btn-right" class="tc-btn">&#8594;</button>
-  <button id="btn-jump"  class="tc-btn">&#8593;</button>
-  <button id="btn-punch" class="tc-btn">👊</button>
-  <button id="btn-kick"  class="tc-btn">🦶</button>
-</div>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 <script>
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 1;
+
+let GLOBAL_DIFFICULTY = 3; // Default
 
 class Fighter extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y, texture, punchTexture, kickTexture, hitboxWidth = 80, hitboxHeight = 80, hitboxOffset = 60, facingLeft = false) {
@@ -172,26 +165,48 @@ class CharacterSelect extends Phaser.Scene {
       fontFamily: 'Arial', fontSize: '38px', color: '#fff'
     }).setOrigin(0.5);
 
-    // Image selects
-    const elon = this.add.image(250, 270, 'elon').setScale(0.5).setInteractive({ useHandCursor: true });
-    const trump = this.add.image(550, 270, 'trump').setScale(0.5).setInteractive({ useHandCursor: true });
+    // --- DIFFICULTY SLIDER HTML ---
+    const sliderDiv = document.createElement('div');
+    sliderDiv.style.position = 'absolute';
+    sliderDiv.style.left = '50%';
+    sliderDiv.style.top = '68%';
+    sliderDiv.style.transform = 'translate(-50%, -50%)';
+    sliderDiv.style.zIndex = 10;
+    sliderDiv.style.background = 'rgba(20,20,30,0.85)';
+    sliderDiv.style.padding = '18px 32px';
+    sliderDiv.style.borderRadius = '16px';
+    sliderDiv.style.boxShadow = '0 2px 14px #000a';
+    sliderDiv.innerHTML = `
+      <label for="diffslider" style="color:#ffe83b;font-size:1.18em;font-family:Arial;">AI Difficulty:&nbsp;
+        <span id="diffdisplay" style="color:#fff;font-weight:bold;">3</span>
+      </label><br>
+      <input type="range" min="1" max="5" value="3" id="diffslider" style="width:210px;">
+      <span style="color:#888;font-size:0.92em;margin-left:8px;">(1=Easy, 5=Max)</span>
+    `;
+    document.body.appendChild(sliderDiv);
+
+    const diffSlider = document.getElementById('diffslider');
+    const diffDisplay = document.getElementById('diffdisplay');
+    diffSlider.addEventListener('input', () => {
+      diffDisplay.textContent = diffSlider.value;
+      GLOBAL_DIFFICULTY = Number(diffSlider.value);
+    });
+
+    const elon = this.add.image(250, 270, 'elon').setScale(0.5).setInteractive();
+    const trump = this.add.image(550, 270, 'trump').setScale(0.5).setInteractive();
     this.add.text(250, 370, 'ELON', { fontSize: '24px', color: '#00eaff' }).setOrigin(0.5);
     this.add.text(550, 370, 'TRUMP', { fontSize: '24px', color: '#ffbc00' }).setOrigin(0.5);
 
-    // Keyboard hotkeys
-    this.input.keyboard.on('keydown-E', () => this.select('elon'));
-    this.input.keyboard.on('keydown-T', () => this.select('trump'));
+    elon.on('pointerdown', () => this.select('elon', GLOBAL_DIFFICULTY, sliderDiv));
+    trump.on('pointerdown', () => this.select('trump', GLOBAL_DIFFICULTY, sliderDiv));
 
-    elon.on('pointerdown', () => this.select('elon'));
-    trump.on('pointerdown', () => this.select('trump'));
-
-    if (IS_TOUCH) {
-      elon.setInteractive();
-      trump.setInteractive();
-    }
+    // Keyboard controls for fast nerds
+    this.input.keyboard.on('keydown-E', () => this.select('elon', GLOBAL_DIFFICULTY, sliderDiv));
+    this.input.keyboard.on('keydown-T', () => this.select('trump', GLOBAL_DIFFICULTY, sliderDiv));
   }
-  select(character) {
-    this.scene.start('MainScene', { selected: character });
+  select(character, difficulty, sliderDiv) {
+    if (sliderDiv) sliderDiv.remove();
+    this.scene.start('MainScene', { selected: character, difficulty });
   }
 }
 
@@ -210,17 +225,18 @@ class MainScene extends Phaser.Scene {
     this.load.audio('punch', 'punch.mp3');
   }
   create(data) {
+    const DIFFICULTY = data.difficulty || GLOBAL_DIFFICULTY || 3;
+
     this.add.image(400, 225, 'background');
     this.sound.add('bgmusic', { loop: true, volume: 0.5 }).play();
 
-    // --- FIXED: Right fighter always faces left, left fighter always faces right
     const isElon = data.selected === 'elon';
     const p1Data = isElon
       ? { t: 'elon', punch: 'elon_punch', kick: 'elonkick', off: 60, left: false }
-      : { t: 'trump', punch: 'trump_punch', kick: 'trumpkick', off: 60, left: false };
+      : { t: 'trump', punch: 'trump_punch', kick: 'trumpkick', off: 95, left: true };
     const aiData = isElon
       ? { t: 'trump', punch: 'trump_punch', kick: 'trumpkick', off: 95, left: true }
-      : { t: 'elon', punch: 'elon_punch', kick: 'elonkick', off: 95, left: true };
+      : { t: 'elon', punch: 'elon_punch', kick: 'elonkick', off: 60, left: false };
 
     this.player1 = new Fighter(this, 200, 300, p1Data.t, p1Data.punch, p1Data.kick, 80, 80, p1Data.off, p1Data.left);
     this.player2 = new Fighter(this, 600, 300, aiData.t, aiData.punch, aiData.kick, 80, 80, aiData.off, aiData.left);
@@ -285,6 +301,9 @@ class MainScene extends Phaser.Scene {
       set(document.getElementById('btn-punch'), 'punch');
       set(document.getElementById('btn-kick'),  'kick');
     }
+
+    // Save for update loop
+    this.AI_DIFFICULTY = DIFFICULTY;
   }
   endRound(message) {
     this.physics.pause();
@@ -316,56 +335,63 @@ class MainScene extends Phaser.Scene {
     if (p1Punch) this.player1.punch();
     if (p1Kick) this.player1.kick();
 
-    // ---- AI opponent controls ----
-// ---- AI opponent controls ----
-if (this.player2.isAI && !this.physics.world.isPaused) {
-  const p1 = this.player1, ai = this.player2;
-  let dist = ai.x - p1.x;
-  let absDist = Math.abs(dist);
-  let verticalDist = ai.y - p1.y;
+    // --- AI opponent controls (difficulty slider affects aggression) ---
+    if (this.player2.isAI && !this.physics.world.isPaused) {
+      const p1 = this.player1, ai = this.player2;
+      let dist = ai.x - p1.x;
+      let absDist = Math.abs(dist);
+      let verticalDist = ai.y - p1.y;
 
-  ai.setVelocityX(0);
+      // DIFFICULTY: 1 (easy) .. 5 (insane)
+      const d = (this.AI_DIFFICULTY || 3); // 1-5
 
-  // SLOW DOWN: reduce run/walk speeds by 30%
-  if (absDist > 90) {
-    ai.setVelocityX(dist > 0 ? -210 : 210);  // 300 * 0.7 = 210
-  } else if (absDist < 60) {
-    ai.setVelocityX(dist > 0 ? 84 : -84);    // 120 * 0.7 = 84
-  }
+      // Scale 1=slow, 5=fast
+      const SPEED_FACTOR = Phaser.Math.Linear(0.6, 1.15, (d-1)/4); // 0.6 to 1.15
+      const AGGRO = Phaser.Math.Linear(0.3, 1, (d-1)/4); // How eager to attack/jump
+      const COOLDOWN_MULT = Phaser.Math.Linear(1.6, 0.6, (d-1)/4); // Lower is faster
 
-  // SLOWER: Jump-over chance less often (from 20% to 14%)
-  if (
-    ai.body.blocked.down &&
-    absDist < 150 && absDist > 40 &&
-    Math.random() < 0.14  // 0.20 * 0.7 = 0.14
-  ) {
-    ai.setVelocityY(-440);
-    ai.setVelocityX(dist > 0 ? -182 : 182);  // 260 * 0.7 = 182
-  }
-  // Less random hopping, too
-  else if (
-    ai.body.blocked.down &&
-    (Math.random() < 0.056 || (verticalDist > 50 && Math.abs(verticalDist) > 40)) // 0.08 * 0.7 = 0.056
-  ) {
-    ai.jump();
-  }
+      ai.setVelocityX(0);
 
-  // SLOW DOWN: Attack less frequently by increasing cooldown by ~30%
-  if (
-    !ai.isAttacking &&
-    absDist < 110 && Math.abs(ai.y - p1.y) < 65
-  ) {
-    if (Math.random() < 0.7) ai.punch();
-    else ai.kick();
-    ai.aiTimer = this.time.now + (200 + Math.random() * 150) * 1.3; // 30% more cooldown
-  }
+      // Fast approach, backs up if too close (all scaled by SPEED_FACTOR)
+      if (absDist > 90) {
+        ai.setVelocityX((dist > 0 ? -300 : 300) * SPEED_FACTOR);
+      } else if (absDist < 60) {
+        ai.setVelocityX((dist > 0 ? 120 : -120) * SPEED_FACTOR);
+      }
 
-  if (!ai.aiTimer || ai.aiTimer < this.time.now) {
-    ai.aiTimer = this.time.now + (45 + Math.random() * 55) * 1.3;
-  }
-} else {
-  this.player2.setVelocityX(0);
-}
+      // JUMP-OVER: chance to leap over you, scales with AGGRO
+      if (
+        ai.body.blocked.down &&
+        absDist < 150 && absDist > 40 &&
+        Math.random() < 0.20 * AGGRO
+      ) {
+        ai.setVelocityY(-440 * SPEED_FACTOR);
+        ai.setVelocityX((dist > 0 ? -260 : 260) * SPEED_FACTOR);
+      }
+      // Random hopping, scales with AGGRO
+      else if (
+        ai.body.blocked.down &&
+        (Math.random() < 0.08 * AGGRO || (verticalDist > 50 && Math.abs(verticalDist) > 40))
+      ) {
+        ai.jump();
+      }
+
+      // ATTACK: As soon as in attack range
+      if (
+        !ai.isAttacking &&
+        absDist < 110 && Math.abs(ai.y - p1.y) < 65
+      ) {
+        if (Math.random() < 0.7 * AGGRO) ai.punch();
+        else ai.kick();
+        ai.aiTimer = this.time.now + (200 + Math.random() * 150) * COOLDOWN_MULT;
+      }
+
+      if (!ai.aiTimer || ai.aiTimer < this.time.now) {
+        ai.aiTimer = this.time.now + (45 + Math.random() * 55) * COOLDOWN_MULT;
+      }
+    } else {
+      this.player2.setVelocityX(0);
+    }
 
     this.player1.updateAttackBox();
     this.player2.updateAttackBox();
@@ -375,6 +401,7 @@ if (this.player2.isAI && !this.physics.world.isPaused) {
   }
 }
 
+// Resize stuff is unchanged
 const resizeGame = () => {
   const w = window.innerWidth, h = window.innerHeight;
   const r = Math.min(w/800, h/450);
@@ -386,6 +413,7 @@ const resizeGame = () => {
 };
 window.addEventListener('resize', resizeGame);
 
+// --- GAME CONFIG WITH MULTI-SCENE ---
 const config = {
   type: Phaser.AUTO,
   width: 800,

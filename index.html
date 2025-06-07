@@ -52,29 +52,72 @@
     #btn-jump  { left: 44vw; bottom: 12vw; }
     #btn-punch { right: 18vw; bottom: 8vw; }
     #btn-kick  { right: 4vw; bottom: 2vw; }
-    .select-btn {
-      border: none;
-      background: #333d;
-      color: #fff;
-      font-size: 22px;
-      border-radius: 20px;
-      margin: 10px 30px;
-      padding: 10px 40px;
-      cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-      outline: none;
-      box-shadow: 0 0 8px #000a;
+    /* Difficulty slider outside Phaser! */
+    #diff-container {
+      position: fixed;
+      left: 50%;
+      top: 70%;
+      transform: translate(-50%, -50%);
+      z-index: 99;
+      background: rgba(20,20,30,0.92);
+      padding: 18px 32px 10px 32px;
+      border-radius: 16px;
+      box-shadow: 0 2px 14px #000a;
+      display: none;
+      min-width: 260px;
+      text-align: center;
+      pointer-events: auto;
+      user-select: none;
     }
-    .select-btn:hover, .select-btn:focus {
-      background: #ffe83b;
-      color: #1a1a1a;
+    #diffslider {
+      width: 210px;
+      margin-top: 6px;
+    }
+    #diff-labels {
+      display: flex;
+      justify-content: space-between;
+      color: #999;
+      font-size: 0.92em;
+      width: 210px;
+      margin: 0 auto;
+      margin-top: 2px;
+      letter-spacing: 0.5px;
+    }
+    #diffdisplay {
+      color: #fff;
+      font-weight: bold;
+      padding: 0 2px;
     }
   </style>
+</head>
+<body>
+<div class="touch-controls" id="touch-controls">
+  <button id="btn-left"  class="tc-btn">&#8592;</button>
+  <button id="btn-right" class="tc-btn">&#8594;</button>
+  <button id="btn-jump"  class="tc-btn">&#8593;</button>
+  <button id="btn-punch" class="tc-btn">👊</button>
+  <button id="btn-kick"  class="tc-btn">🦶</button>
+</div>
+
+<!-- Difficulty slider OUTSIDE Phaser for perfect clicking -->
+<div id="diff-container">
+  <label for="diffslider" style="color:#ffe83b;font-size:1.18em;font-family:Arial;">AI Difficulty:&nbsp;
+    <span id="diffdisplay">3</span>
+  </label><br>
+  <input type="range" min="1" max="5" value="3" id="diffslider">
+  <div id="diff-labels">
+    <span>Easy</span>
+    <span>Normal</span>
+    <span>Hard</span>
+    <span>Insane</span>
+    <span>BROKEN</span>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 <script>
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 1;
-
-let GLOBAL_DIFFICULTY = 3; // Default
+let GLOBAL_DIFFICULTY = 3;
 
 class Fighter extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y, texture, punchTexture, kickTexture, hitboxWidth = 80, hitboxHeight = 80, hitboxOffset = 60, facingLeft = false) {
@@ -165,48 +208,52 @@ class CharacterSelect extends Phaser.Scene {
       fontFamily: 'Arial', fontSize: '38px', color: '#fff'
     }).setOrigin(0.5);
 
-    // --- DIFFICULTY SLIDER HTML ---
-    const sliderDiv = document.createElement('div');
-    sliderDiv.style.position = 'absolute';
-    sliderDiv.style.left = '50%';
-    sliderDiv.style.top = '68%';
-    sliderDiv.style.transform = 'translate(-50%, -50%)';
-    sliderDiv.style.zIndex = 10;
-    sliderDiv.style.background = 'rgba(20,20,30,0.85)';
-    sliderDiv.style.padding = '18px 32px';
-    sliderDiv.style.borderRadius = '16px';
-    sliderDiv.style.boxShadow = '0 2px 14px #000a';
-    sliderDiv.innerHTML = `
-      <label for="diffslider" style="color:#ffe83b;font-size:1.18em;font-family:Arial;">AI Difficulty:&nbsp;
-        <span id="diffdisplay" style="color:#fff;font-weight:bold;">3</span>
-      </label><br>
-      <input type="range" min="1" max="5" value="3" id="diffslider" style="width:210px;">
-      <span style="color:#888;font-size:0.92em;margin-left:8px;">(1=Easy, 5=Max)</span>
-    `;
-    document.body.appendChild(sliderDiv);
+    document.getElementById('diff-container').style.display = 'block';
 
     const diffSlider = document.getElementById('diffslider');
     const diffDisplay = document.getElementById('diffdisplay');
-    diffSlider.addEventListener('input', () => {
+    diffSlider.value = GLOBAL_DIFFICULTY;
+    diffDisplay.textContent = GLOBAL_DIFFICULTY;
+
+    diffSlider.oninput = () => {
       diffDisplay.textContent = diffSlider.value;
       GLOBAL_DIFFICULTY = Number(diffSlider.value);
-    });
+    };
 
+    // --- Character select ---
     const elon = this.add.image(250, 270, 'elon').setScale(0.5).setInteractive();
     const trump = this.add.image(550, 270, 'trump').setScale(0.5).setInteractive();
     this.add.text(250, 370, 'ELON', { fontSize: '24px', color: '#00eaff' }).setOrigin(0.5);
     this.add.text(550, 370, 'TRUMP', { fontSize: '24px', color: '#ffbc00' }).setOrigin(0.5);
 
-    elon.on('pointerdown', () => this.select('elon', GLOBAL_DIFFICULTY, sliderDiv));
-    trump.on('pointerdown', () => this.select('trump', GLOBAL_DIFFICULTY, sliderDiv));
+    // Use event check instead of sliderActive
+    const isEventFromSlider = (pointerEvent) => {
+      if (!pointerEvent || !pointerEvent.target) return false;
+      // Check if the event target or any parent is #diff-container
+      let el = pointerEvent.target;
+      while (el) {
+        if (el.id === "diff-container") return true;
+        el = el.parentElement;
+      }
+      return false;
+    };
 
-    // Keyboard controls for fast nerds
-    this.input.keyboard.on('keydown-E', () => this.select('elon', GLOBAL_DIFFICULTY, sliderDiv));
-    this.input.keyboard.on('keydown-T', () => this.select('trump', GLOBAL_DIFFICULTY, sliderDiv));
+    elon.on('pointerdown', (pointer) => {
+      if (isEventFromSlider(pointer.event)) return; // Ignore if click originated from slider
+      this.select('elon');
+    });
+    trump.on('pointerdown', (pointer) => {
+      if (isEventFromSlider(pointer.event)) return;
+      this.select('trump');
+    });
+
+    // Keyboard select always allowed
+    this.input.keyboard.on('keydown-E', () => this.select('elon'));
+    this.input.keyboard.on('keydown-T', () => this.select('trump'));
   }
-  select(character, difficulty, sliderDiv) {
-    if (sliderDiv) sliderDiv.remove();
-    this.scene.start('MainScene', { selected: character, difficulty });
+  select(character) {
+    document.getElementById('diff-container').style.display = 'none';
+    this.scene.start('MainScene', { selected: character, difficulty: GLOBAL_DIFFICULTY });
   }
 }
 
@@ -401,7 +448,6 @@ class MainScene extends Phaser.Scene {
   }
 }
 
-// Resize stuff is unchanged
 const resizeGame = () => {
   const w = window.innerWidth, h = window.innerHeight;
   const r = Math.min(w/800, h/450);
@@ -413,7 +459,6 @@ const resizeGame = () => {
 };
 window.addEventListener('resize', resizeGame);
 
-// --- GAME CONFIG WITH MULTI-SCENE ---
 const config = {
   type: Phaser.AUTO,
   width: 800,

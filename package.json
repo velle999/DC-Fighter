@@ -1,0 +1,49 @@
+{
+  "name": "dc-fighter",
+  "version": "1.0.0",
+  "main": "main.js",
+  "description": "DC Fighter: Desktop build",
+  "author": "Velle",
+  "license": "ISC",
+  "homepage": "https://github.com/velle999/DC-Fighter#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/velle999/DC-Fighter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/velle999/DC-Fighter/issues"
+  },
+  "keywords": [],
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^36.4.0",
+    "electron-builder": "^24.14.1"
+  },
+  "build": {
+    "appId": "com.velle.dcfighter",
+    "productName": "DC Fighter",
+    "files": [
+      "**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "DC Fighter"
+    }
+  }
+}

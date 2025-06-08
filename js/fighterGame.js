@@ -199,6 +199,7 @@ window.createMainScene = function(data) {
   const cx = this.sys.game.config.width / 2;
   const cy = this.sys.game.config.height / 2;
 
+  this.aiConf = {...aiConf, difficulty: data.difficulty};
   this.add.image(cx, cy, 'background').setDisplaySize(this.sys.game.config.width, this.sys.game.config.height);
 
   const p1Conf = F[data.selected];
@@ -290,8 +291,9 @@ window.updateMainScene = function() {
     let dist = ai.x - p1.x;
     let absDist = Math.abs(dist);
 
-    const SPEED = 115 + Math.random() * 50;
-    const AGGRO = 0.75;
+    const difficulty = this.aiConf.difficulty || 3;
+    const SPEED = 110 + difficulty * 25 + Math.random() * 20;
+    const AGGRO = 0.4 + 0.15 * difficulty;
     ai.setVelocityX(0);
 
     if (absDist > 110) {
@@ -303,8 +305,8 @@ window.updateMainScene = function() {
     if (ai.body.blocked.down && absDist < 180 && Math.random() < 0.15 * AGGRO) ai.jump();
 
     if (!ai.isAttacking && absDist < 97 && Math.abs(ai.y - p1.y) < 65) {
-      if (Math.random() < 0.7) ai.punch();
-      else ai.kick();
+    if (Math.random() < AGGRO) ai.punch();
+    else ai.kick();
     }
 
     if (this.tauntTimer < now && Math.random() < 0.016) {
